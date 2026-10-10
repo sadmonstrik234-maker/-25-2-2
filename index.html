@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="description" content="Система управления заявками: тикеты, приоритеты, исполнители и контроль SLA.">
+  <link rel="icon" href="support-logo.svg" type="image/svg+xml">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <script>
+    (function () {
+      var d = document.documentElement, t = null, a = null;
+      try { t = localStorage.getItem('theme'); a = JSON.parse(localStorage.getItem('accent') || 'null'); } catch (e) {}
+      if (t !== 'light' && t !== 'dark' && t !== 'contrast') {
+        t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      }
+      d.setAttribute('data-theme', t);
+      if (a && a.on) {
+        d.style.setProperty('--accent-r', a.r); d.style.setProperty('--accent-g', a.g);
+        d.style.setProperty('--accent-b', a.b); d.style.setProperty('--on-accent', a.on);
+      }
+    })();
+  </script>
+  <title>Служба поддержки: заявки</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Перейти к основному контенту</a>
+  <header class="site-header">
+    <button type="button" id="burger" class="burger" aria-label="Открыть меню" aria-expanded="false" aria-controls="sidebar">
+      <span class="burger__bar"></span><span class="burger__bar"></span><span class="burger__bar"></span>
+    </button>
+    <hgroup>
+      <h1>Служба поддержки</h1>
+      <p>Заявки, приоритеты, исполнители и SLA</p>
+    </hgroup>
+    <details class="theme-menu" id="theme-menu">
+      <summary class="btn btn--ghost" aria-label="Оформление: тема и акцентный цвет"><span aria-hidden="true">&#9680;</span><span class="theme-menu__text">Тема</span></summary>
+      <div class="theme-menu__panel">
+        <div class="field">
+          <label class="field__label" for="theme-select">Тема оформления</label>
+          <select id="theme-select" class="select">
+            <option value="auto">Авто (как в системе)</option>
+            <option value="light">Светлая</option>
+            <option value="dark">Тёмная</option>
+            <option value="contrast">Высокий контраст</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="accent">Акцентный цвет</label>
+          <input type="color" id="accent" class="color" value="#2dd4a7">
+          <output id="accent-hex" for="accent"></output>
+        </div>
+        <button type="button" id="accent-reset" class="btn btn--ghost" disabled>Сбросить цвет</button>
+      </div>
+    </details>
+  </header>
+  <div class="overlay" id="overlay" aria-hidden="true"></div>
+
+  <nav id="sidebar" class="sidebar" aria-label="Разделы">
+    <figure class="logo">
+      <img src="support-logo.svg" alt="Логотип службы поддержки: гарнитура оператора" width="48" height="48">
+      <figcaption>Поддержка</figcaption>
+    </figure>
+    <ul>
+      <li><a href="#overview">Обзор</a></li>
+      <li><a href="#tickets">Заявки</a></li>
+      <li><a href="#escalations">Эскалации</a></li>
+    </ul>
+  </nav>
+
+  <main id="main" tabindex="-1">
+    <section id="overview" aria-labelledby="h-overview">
+      <h2 id="h-overview">Обзор</h2>
+      <div id="summary"></div>
+    </section>
+
+    <section id="tickets" aria-labelledby="h-tickets">
+      <div class="section-head">
+        <h2 id="h-tickets">Заявки</h2>
+        <button type="button" id="add-ticket" class="btn"><span aria-hidden="true">+</span> Создать заявку</button>
+      </div>
+      <form id="filters" class="filters" aria-label="Фильтры заявок">
+        <div class="field">
+          <label class="field__label" for="q">Поиск</label>
+          <input id="q" class="input" type="search" placeholder="Тема, заявитель, исполнитель, тег" autocomplete="off">
+        </div>
+        <div class="field">
+          <label class="field__label" for="status">Статус</label>
+          <select id="status" class="select">
+            <option value="all">Все</option>
+            <option value="new">Новая</option>
+            <option value="inProgress">В работе</option>
+            <option value="waiting">Ждёт ответа</option>
+            <option value="resolved">Решена</option>
+          </select>
+        </div>
+        <div class="field">
+          <label class="field__label" for="category">Категория</label>
+          <select id="category" class="select">
+            <option value="all">Все</option>
+            <option value="access">Доступы</option>
+            <option value="hardware">Оборудование</option>
+            <option value="software">Программы</option>
+            <option value="network">Сеть</option>
+            <option value="other">Прочее</option>
+          </select>
+        </div>
+        <fieldset class="field">
+          <legend class="field__label">Приоритет</legend>
+          <input class="check" type="checkbox" id="p-high" name="priority" value="high" checked><label for="p-high">Высокий</label>
+          <input class="check" type="checkbox" id="p-medium" name="priority" value="medium" checked><label for="p-medium">Средний</label>
+          <input class="check" type="checkbox" id="p-low" name="priority" value="low" checked><label for="p-low">Низкий</label>
+        </fieldset>
+        <fieldset class="field">
+          <legend class="field__label">Вид</legend>
+          <input class="radio" type="radio" id="v-cards" name="view" value="cards" checked><label for="v-cards">Карточки</label>
+          <input class="radio" type="radio" id="v-table" name="view" value="table"><label for="v-table">Таблица</label>
+        </fieldset>
+        <button type="reset" id="reset" class="btn btn--ghost" disabled>Сбросить</button>
+        <output id="result-count" for="q status category"></output>
+      </form>
+      <div id="ticket-view"></div>
+      <nav id="pagination" class="pagination-nav" aria-label="Постраничная навигация по заявкам" hidden></nav>
+    </section>
+
+    <section id="escalations" aria-labelledby="h-escalations">
+      <h2 id="h-escalations">Эскалации</h2>
+      <div id="tablist" class="tablist" role="tablist" aria-label="Эскалации по статусу">
+        <button type="button" role="tab" class="tab" id="tab-all" aria-controls="tabpanel" aria-selected="true" tabindex="0" data-status="all">Все <span class="tab__count">0</span></button>
+        <button type="button" role="tab" class="tab" id="tab-open" aria-controls="tabpanel" aria-selected="false" tabindex="-1" data-status="open">Открытые <span class="tab__count">0</span></button>
+        <button type="button" role="tab" class="tab" id="tab-taken" aria-controls="tabpanel" aria-selected="false" tabindex="-1" data-status="taken">В работе <span class="tab__count">0</span></button>
+        <button type="button" role="tab" class="tab" id="tab-closed" aria-controls="tabpanel" aria-selected="false" tabindex="-1" data-status="closed">Закрытые <span class="tab__count">0</span></button>
+      </div>
+      <div id="tabpanel" class="tabpanel" role="tabpanel" aria-labelledby="tab-all"></div>
+    </section>
+  </main>
+
+  <aside class="panel" aria-labelledby="h-panel">
+    <h2 id="h-panel">Срочные эскалации</h2>
+    <div id="escalation-panel"></div>
+  </aside>
+
+  <footer class="site-footer">
+    <p>Дежурная смена поддержки</p>
+    <address>
+      <a href="mailto:support@example.com">support@example.com</a>, Москва, Россия
+    </address>
+  </footer>
+
+  <dialog id="modal" class="modal" aria-labelledby="modal-title">
+    <article class="modal__box">
+      <header class="modal__head">
+        <h2 id="modal-title">Детали обращения</h2>
+        <button type="button" data-close id="modal-x" class="btn btn--ghost btn--icon" aria-label="Закрыть окно">&times;</button>
+      </header>
+      <div id="modal-body" class="modal__body"></div>
+      <footer class="modal__foot">
+        <button type="button" id="modal-copy" class="btn btn--ghost">Копировать ID</button>
+        <button type="button" data-close id="modal-close" class="btn">Закрыть</button>
+      </footer>
+    </article>
+  </dialog>
+
+  <div id="toasts" class="toasts" popover="manual"></div>
+  <p id="live" class="sr-only" role="status"></p>
+
+  <dialog id="form-modal" class="modal" aria-labelledby="form-title">
+    <form id="ticket-form" class="modal__box" novalidate>
+      <header class="modal__head">
+        <h2 id="form-title">Создать заявку</h2>
+        <button type="button" data-close class="btn btn--ghost btn--icon" aria-label="Закрыть окно">&times;</button>
+      </header>
+      <section class="modal__body form-grid" aria-label="Данные заявки">
+        <div class="field">
+          <label class="field__label" for="f-title">Тема <span class="req" aria-hidden="true">*</span></label>
+          <input id="f-title" name="title" class="input" type="text" required minlength="3" maxlength="80" autocomplete="off" autofocus data-validate aria-invalid="false" aria-describedby="f-title-hint f-title-error">
+          <p id="f-title-hint" class="field__hint">От 3 до 80 символов</p>
+          <p id="f-title-error" class="field__error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-category">Категория <span class="req" aria-hidden="true">*</span></label>
+          <select id="f-category" name="category" class="select" required data-validate aria-invalid="false" aria-describedby="f-category-error">
+            <option value="">Выберите категорию</option>
+            <option value="access">Доступы</option>
+            <option value="hardware">Оборудование</option>
+            <option value="software">Программы</option>
+            <option value="network">Сеть</option>
+            <option value="other">Прочее</option>
+          </select>
+          <p id="f-category-error" class="field__error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-priority">Приоритет <span class="req" aria-hidden="true">*</span></label>
+          <select id="f-priority" name="priority" class="select" required data-validate aria-invalid="false" aria-describedby="f-priority-hint f-priority-error">
+            <option value="">Выберите приоритет</option>
+            <option value="high">Высокий (SLA 4 часа)</option>
+            <option value="medium">Средний (SLA 8 часов)</option>
+            <option value="low">Низкий (SLA 24 часа)</option>
+          </select>
+          <p id="f-priority-hint" class="field__hint">От приоритета зависит срок решения</p>
+          <p id="f-priority-error" class="field__error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-email">Email заявителя <span class="req" aria-hidden="true">*</span></label>
+          <input id="f-email" name="email" class="input" type="email" required maxlength="60" autocomplete="email" data-validate aria-invalid="false" aria-describedby="f-email-error">
+          <p id="f-email-error" class="field__error" aria-live="polite" hidden></p>
+        </div>
+        <div class="field">
+          <label class="field__label" for="f-description">Описание</label>
+          <textarea id="f-description" name="description" class="input" rows="3" data-validate aria-invalid="false" aria-describedby="f-description-count f-description-error"></textarea>
+          <p id="f-description-count" class="field__hint">0 / 160</p>
+          <p id="f-description-error" class="field__error" aria-live="polite" hidden></p>
+        </div>
+      </section>
+      <footer class="modal__foot">
+        <button type="button" data-close class="btn btn--ghost">Отмена</button>
+        <button type="submit" class="btn">Создать</button>
+      </footer>
+    </form>
+  </dialog>
+  <script src="script.js"></script>
+</body>
+</html>
